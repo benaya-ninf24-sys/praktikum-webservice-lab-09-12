@@ -1,8 +1,32 @@
 const express = require('express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const amqp = require('amqplib');
 
 const PRODUCT_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3000';
+const AMQP_URL = process.env.AMQP_URL || 'amqp://localhost';
+let channel = null;
+
+async function connectQueue() {
+  try {
+    const conn = await amqp.connect(AMQP_URL);
+    conn.on('error', () => {});
+    conn.on('close', () => { channel = null; setTimeout(connectQueue, 3000); });
+    channel = await conn.createChannel();
+    await channel.assertExchange('orders', 'fanout', { durable: true });
+    console.log('terhubung ke RabbitMQ');
+  } catch (e) {
+    console.error('RabbitMQ belum tersedia, coba lagi dalam 3 detik');
+    setTimeout(connectQueue, 3000);
+  }
+}
+
+function publishOrderCreated(order) {
+  if (!channel) { console.warn('channel tidak tersedia, event TIDAK terkirim:', order.id); return false; }
+  const body = Buffer.from(JSON.stringify({ type: 'order.created', data: order }));
+  return channel.publish('orders', '', body,
+    { persistent: true, contentType: 'application/json', messageId: `order-${order.id}` });
+}
 const app = express();
 app.use(express.json());
 
@@ -119,6 +143,7 @@ app.post('/orders', async (request, response) => {
     createdAt: new Date().toISOString(),
   };
   orders.push(order);
+  publishOrderCreated(order);
 
   response.status(201).json(order);
 });
@@ -130,4 +155,5 @@ app.get('/orders', (request, response) => {
 const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`Order service listening on port ${port}`);
+  connectQueue();
 });

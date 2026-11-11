@@ -1,0 +1,12 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "description": "Consumer service for order events via RabbitMQ",
+  "main": "notification-service.js",
+  "scripts": {
+    "start": "node notification-service.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4"
+  }
+}
