@@ -1,3 +1,4 @@
+
 name: Week 12 Automated Testing
 
 on:
@@ -31,45 +32,40 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            week 12/praktikum-webservice-lab-09-11/package-lock.json
-            week 12/praktikum-webservice-lab-09-11/services/product-service/package-lock.json
-            week 12/praktikum-webservice-lab-09-11/services/order-service/package-lock.json
-            week 12/praktikum-webservice-lab-09-11/services/notification-service/package-lock.json
+            package-lock.json
+            services/product-service/package-lock.json
+            services/order-service/package-lock.json
+            services/notification-service/package-lock.json
 
       - name: Install root dependencies
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: npm ci
 
       - name: Install Product Service dependencies
-        working-directory: week 12/praktikum-webservice-lab-09-11/services/product-service
+        working-directory: services/product-service
         run: npm ci
 
       - name: Install Order Service dependencies
-        working-directory: week 12/praktikum-webservice-lab-09-11/services/order-service
+        working-directory: services/order-service
         run: npm ci
 
       - name: Install Notification Service dependencies
-        working-directory: week 12/praktikum-webservice-lab-09-11/services/notification-service
+        working-directory: services/notification-service
         run: npm ci
 
       - name: Run lint when available
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: npm run lint --if-present
 
       - name: Start Product Service
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: |
           node services/product-service/product-service.js > product-service.log 2>&1 &
           echo $! > product-service.pid
 
       - name: Start Order Service
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: |
           node services/order-service/order-service.js > order-service.log 2>&1 &
           echo $! > order-service.pid
 
       - name: Start API Gateway
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: |
           node gateway.js > gateway.log 2>&1 &
           echo $! > gateway.pid
@@ -82,7 +78,7 @@ jobs:
             "http://localhost:8080/health"; do
             ready=false
             for attempt in {1..30}; do
-              if curl --fail --silent --show-error "$service_url" > /dev/null; then
+              if curl --fail --silent "$service_url" > /dev/null 2>&1; then
                 echo "READY: $service_url"
                 ready=true
                 break
@@ -96,12 +92,10 @@ jobs:
           done
 
       - name: Run automated tests
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: npm test
 
       - name: Show service logs
         if: always()
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: |
           for log_file in gateway.log product-service.log order-service.log; do
             echo "===== $log_file ====="
@@ -117,13 +111,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: week-12-service-logs
-          path: week 12/praktikum-webservice-lab-09-11/*.log
+          path: |
+            gateway.log
+            product-service.log
+            order-service.log
           if-no-files-found: warn
           retention-days: 7
 
       - name: Stop service processes
         if: always()
-        working-directory: week 12/praktikum-webservice-lab-09-11
         run: |
           for pid_file in gateway.pid product-service.pid order-service.pid; do
             if [ -f "$pid_file" ]; then
