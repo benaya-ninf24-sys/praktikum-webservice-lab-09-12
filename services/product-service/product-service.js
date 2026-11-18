@@ -229,7 +229,7 @@ function reserveStock(productId, qty) {
     };
   }
   if (product.stock < qty) {
-    return { status: 409, body: { error: 'Insufficient stock' } };
+    return { status: 400, body: { error: 'Insufficient stock' } };
   }
   product.stock -= qty;
   return { status: 200, body: product };
