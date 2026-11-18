@@ -34,6 +34,10 @@ Browser ──▶ Gateway :8080/docs (Swagger UI gabungan)
 - `PORT`: Port service (default: `3001`)
 - `PRODUCT_SERVICE_URL`: Base URL product-service untuk reserve stok (default: `http://localhost:3000`)
 
+### Notification Service (`services/notification-service/notification-service.js`)
+- `METRICS_PORT`: Port metrics dan health Notification Service (default: `3002`)
+- `AMQP_URL`: URL RabbitMQ (default: `amqp://localhost`)
+
 ## 4. Cara Menjalankan Layanan
 Jalankan dependensi dan service sesuai urutan berikut:
 
@@ -93,3 +97,32 @@ Semua endpoint diuji melalui Gateway (`http://localhost:8080`):
   category: { type: string, example: Periferal }
   ```
 - **Catatan**: Code-first mengurangi drift karena anotasi berada satu file dengan kode, namun drift tetap dapat terjadi jika programmer mengubah kode logika/data tanpa memperbarui komentar `@openapi`.
+
+## 7. Monitoring Service
+
+Jalankan semua service terlebih dahulu, kemudian mulai monitoring dari root project:
+
+```bash
+npm run monitor
+```
+
+Pemeriksaan akan berjalan secara berkala dengan interval default 5 detik dan timeout default 2 detik. Tekan `Ctrl+C` untuk menghentikan monitoring dengan aman.
+
+Konfigurasi dapat diubah melalui environment variable:
+
+```bash
+# PowerShell
+$env:GATEWAY_URL="http://localhost:8080/health"
+$env:PRODUCT_SERVICE_URL="http://localhost:3000/health"
+$env:ORDER_SERVICE_URL="http://localhost:3001/health"
+$env:NOTIFICATION_SERVICE_URL="http://localhost:3002/health"
+$env:MONITOR_INTERVAL_MS="5000"
+$env:MONITOR_TIMEOUT_MS="2000"
+npm run monitor
+```
+
+Variabel konfigurasi juga dapat dipakai langsung tanpa `npm run`:
+
+```bash
+node scripts/monitor.js
+```

@@ -1,0 +1,132 @@
+name: Week 12 Automated Testing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Automated tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TEST_ENV: true
+      CI: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            week 12/praktikum-webservice-lab-09-11/package-lock.json
+            week 12/praktikum-webservice-lab-09-11/services/product-service/package-lock.json
+            week 12/praktikum-webservice-lab-09-11/services/order-service/package-lock.json
+            week 12/praktikum-webservice-lab-09-11/services/notification-service/package-lock.json
+
+      - name: Install root dependencies
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: npm ci
+
+      - name: Install Product Service dependencies
+        working-directory: week 12/praktikum-webservice-lab-09-11/services/product-service
+        run: npm ci
+
+      - name: Install Order Service dependencies
+        working-directory: week 12/praktikum-webservice-lab-09-11/services/order-service
+        run: npm ci
+
+      - name: Install Notification Service dependencies
+        working-directory: week 12/praktikum-webservice-lab-09-11/services/notification-service
+        run: npm ci
+
+      - name: Run lint when available
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: npm run lint --if-present
+
+      - name: Start Product Service
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: |
+          node services/product-service/product-service.js > product-service.log 2>&1 &
+          echo $! > product-service.pid
+
+      - name: Start Order Service
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: |
+          node services/order-service/order-service.js > order-service.log 2>&1 &
+          echo $! > order-service.pid
+
+      - name: Start API Gateway
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: |
+          node gateway.js > gateway.log 2>&1 &
+          echo $! > gateway.pid
+
+      - name: Wait for service health endpoints
+        run: |
+          for service_url in \
+            "http://localhost:3000/health" \
+            "http://localhost:3001/health" \
+            "http://localhost:8080/health"; do
+            ready=false
+            for attempt in {1..30}; do
+              if curl --fail --silent --show-error "$service_url" > /dev/null; then
+                echo "READY: $service_url"
+                ready=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$ready" != "true" ]; then
+              echo "UNHEALTHY: $service_url"
+              exit 1
+            fi
+          done
+
+      - name: Run automated tests
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: npm test
+
+      - name: Show service logs
+        if: always()
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: |
+          for log_file in gateway.log product-service.log order-service.log; do
+            echo "===== $log_file ====="
+            if [ -f "$log_file" ]; then
+              cat "$log_file"
+            else
+              echo "Log file not found"
+            fi
+          done
+
+      - name: Upload service logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: week-12-service-logs
+          path: week 12/praktikum-webservice-lab-09-11/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Stop service processes
+        if: always()
+        working-directory: week 12/praktikum-webservice-lab-09-11
+        run: |
+          for pid_file in gateway.pid product-service.pid order-service.pid; do
+            if [ -f "$pid_file" ]; then
+              kill "$(cat "$pid_file")" 2>/dev/null || true
+            fi
+          done
